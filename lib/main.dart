@@ -13,7 +13,11 @@ import 'recovery/recovery_module.dart';
 import 'analytics/analytics_module.dart';
 import 'community/community_screen.dart';
 
+import 'analytics/analytics_screen.dart';
 import 'health_profile_screen.dart';
+import 'map/map_screen.dart';
+
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 void main() {
   runApp(const ExposureApp());
@@ -26,8 +30,31 @@ class ExposureApp extends StatelessWidget {
     return MaterialApp(
       title: 'Exposure - Set Home & Auto Counter',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
+        fontFamily: 'Inter', // Global default
+
+        // This section defines the "defaults" for different types of text
+        textTheme: const TextTheme(
+          // For "Pollution Exposure" Header (22px, w800)
+          headlineMedium: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800, // Will use your Bold ttf
+            color: Color(0xFF111827),
+          ),
+          // For the Large Score (56px)
+          displayLarge: TextStyle(
+            fontSize: 56,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.0,
+            color: Color(0xFF111827),
+          ),
+          // For Body labels (Today, Session, etc.)
+          bodySmall: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500, // Will use your Medium ttf
+            color: Color(0xFF6B7280),
+          ),
+        ),
       ),
       home: const HomeScreen(),
     );
@@ -41,6 +68,46 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+
+  Future<void> _setSafeZoneToCurrentLocation() async {
+    setState(() => _status = 'Updating safe zone to current location...');
+    try {
+      // 1. Get the current precise position
+      final pos = await _loc.getCurrentPosition();
+
+      // 2. Save it as the primary home/safe coordinates
+      await StorageService.saveHome(pos.latitude, pos.longitude);
+
+      // 3. Update the Exposure Service so the timer stops/starts immediately
+      await _exposure.setHome(pos.latitude, pos.longitude);
+
+      setState(() {
+        _homeLat = pos.latitude;
+        _homeLng = pos.longitude;
+        _status = 'Safe zone updated to current location!';
+      });
+
+      // 4. Show a SnackBar for better user feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.verified_user, color: Colors.white),
+                SizedBox(width: 10),
+                Text('Location marked as Safe Zone'),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _status = 'Failed to set safe zone: $e');
+    }
+  }
+
   final LocationService _loc = LocationService();
   final ExposureService _exposure = ExposureService();
   final PollutionService _pollution = PollutionService();
@@ -169,14 +236,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       double? newDose;
 
       if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
+
         newDose = 90.0;
+        _manualAqiRefresh();
       } else if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
-        newDose = 250.0;
+        newDose = 160.0;
       } else if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
         newDose = 350.0;
       } else if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
         newDose = 600.0;
       }
+     else if (event.logicalKey == LogicalKeyboardKey.digit5 || event.logicalKey == LogicalKeyboardKey.numpad5) {
+      newDose = 00;
+    }
 
       if (newDose != null) {
         final doseInfo = _pollution.getDoseMessage(newDose);
@@ -187,6 +259,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           _doseMessage = doseInfo.message;
           _status = 'Testing mode: Dose set to ${newDose.toInt()}';
         });
+
+        // --- NEW: Trigger the API fetch ---
+        _manualAqiRefresh();
       }
     }
   }
@@ -300,560 +375,590 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         };
     }
   }
+// Replace your existing build() method with this one.
+// Only the build method changes — all your state, initState,
+// and other methods remain exactly as they are.
 
   @override
   Widget build(BuildContext context) {
-    final theme = _getTheme();
-    final gradientColors = theme['gradient'] as List<Color>;
+    Color exposureColor;
+    Color cardBgColor;
 
-    // Wrap the entire Scaffold with KeyboardListener
-    return KeyboardListener(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyPress,
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
-            ),
-          ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    // Header
-                    // Header with nav button
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const HealthProfileScreen()),
-                            );
-                          },
-                          icon: const Icon(Icons.person, color: Colors.white, size: 28),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            padding: const EdgeInsets.all(12),
-                          ),
-                        ),
-                        const Expanded(
-                          child: Center(
-                            child: Text(
-                              'Pollution Exposure',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 52), // Balance the layout
-                      ],
-                    ),
-                    const SizedBox(height: 30),
+    // Setting the primary color and a very soft pastel background for the main card
+    if (_pollutionDose <= 100) {
+      exposureColor = const Color(0xFF22C55E); // Green
+      cardBgColor = const Color(0xFFF0FDF4);   // Soft Pastel Green
+    } else if (_pollutionDose <= 200) {
+      exposureColor = const Color(0xFFF59E0B); // Amber
+      cardBgColor = const Color(0xFFFFFBEB);   // Soft Pastel Amber
+    } else {
+      exposureColor = const Color(0xFFEF4444); // Red
+      cardBgColor = const Color(0xFFFEF2F2);   // Soft Pastel Red
+    }
 
-                    // Main Exposure Card
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: gradientColors[0].withOpacity(0.3),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
+    return DefaultTabController(
+      length: 3,
+      child: KeyboardListener(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyPress,
+        child: Scaffold(
+          // A cooler, premium off-white background
+          backgroundColor: const Color(0xFFF4F6F8),
+          body: SafeArea(
+            child: Column(
+              children: [
+
+                /// TAB BAR
+                TabBar(
+                  labelColor: const Color(0xFF111827),
+                  unselectedLabelColor: Colors.grey.shade500,
+                  indicatorColor: const Color(0xFF1E293B), // Premium Deep Navy
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                  tabs: const [
+                    Tab(icon: PhosphorIcon(PhosphorIconsBold.house), text: "Home"),
+                    Tab(icon: PhosphorIcon(PhosphorIconsBold.chartBar), text: "Predict"),
+                    Tab(icon: PhosphorIcon(PhosphorIconsBold.mapPin), text: "Map"),
+                  ],
+                ),
+
+                Expanded(
+                  child: TabBarView(
+                    children: [
+
+                      /// HOME TAB
+                      SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                           child: Column(
                             children: [
-                              // Big Exposure Indicator with animated icon
-                              FadeTransition(
-                                opacity: _pulseController,
-                                child: Icon(
-                                  theme['icon'],
-                                  size: 100,
-                                  color: theme['iconColor'],
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                _doseMessage,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Exposure Level',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 18,
-                                ),
-                              ),
-                              const SizedBox(height: 30),
 
-                              // Divider
-                              Container(
-                                height: 1,
-                                color: Colors.white.withOpacity(0.3),
-                              ),
-                              const SizedBox(height: 30),
-
-                              // Exposure Score
+                              /// HEADER
                               Row(
                                 children: [
-                                  Icon(Icons.cloud, color: Colors.white.withOpacity(0.8), size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Exposure Score',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 14,
+                                  IconButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const HealthProfileScreen(),
+                                        ),
+                                      );
+                                    },
+                                    icon: const PhosphorIcon(
+                                      PhosphorIconsBold.userCircle,
+                                      size: 28,
+                                      color: Color(0xFF111827),
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _pollutionDose.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 64,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: (_pollutionDose / 500).clamp(0.0, 1.0),
-                                  backgroundColor: Colors.white.withOpacity(0.2),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                                  minHeight: 8,
-                                ),
-                              ),
-                              const SizedBox(height: 30),
 
-                              // Time Spent
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.hourglass_bottom_rounded, color: Colors.white.withOpacity(0.8), size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Time Exposed Today',
+                                  const Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        "Pollution Exposure",
                                         style: TextStyle(
-                                          color: Colors.white.withOpacity(0.8),
-                                          fontSize: 14,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.3,
+                                          color: Color(0xFF111827),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  Text(
-                                    _formatDuration(_totalExposure),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
 
-                              // Current Session
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.directions_walk_rounded, color: Colors.white.withOpacity(0.8), size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Current Session',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.8),
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    _formatDuration(_currentSession),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  const SizedBox(width: 48), // Balances the Row
                                 ],
                               ),
-                              const SizedBox(height: 16),
 
-                              // Distance to Home
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.home_work_rounded, color: Colors.white.withOpacity(0.8), size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Distance to Home',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.8),
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    _distanceToHomeText(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
                               const SizedBox(height: 24),
-                              // AQI Info Card
+
+                              /// MAIN EXPOSURE CARD (Dynamic Background)
                               Container(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(24),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: cardBgColor,
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: exposureColor.withOpacity(0.2),
+                                    width: 1,
                                   ),
                                 ),
-                                child: Row(
+                                child: Column(
                                   children: [
-                                    Icon(Icons.location_on, color: Colors.white.withOpacity(0.9), size: 20),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+
+                                    /// GOOGLE FIT STYLE CIRCULAR GAUGE
+                                    SizedBox(
+                                      height: 240,
+                                      width: 240,
+                                      child: Stack(
+                                        fit: StackFit.expand,
                                         children: [
-                                          Text(
-                                            'AQI from: ${_aqiLocationName ?? "..."}',
-                                            style: TextStyle(
-                                              color: Colors.white.withOpacity(0.9),
-                                              fontSize: 12,
-                                            ),
+                                          CircularProgressIndicator(
+                                            value: (_pollutionDose / 500).clamp(0.0, 1.0),
+                                            strokeWidth: 14,
+                                            color: exposureColor,
+                                            backgroundColor: exposureColor.withOpacity(0.15),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '${_lastKnownAqi?.round() ?? "--"} US AQI',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              const Text(
+                                                "Exposure Score",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.black54,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _pollutionDose.toStringAsFixed(1),
+                                                style: const TextStyle(
+                                                  fontSize: 56,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: -1.0,
+                                                  height: 1.1,
+                                                  color: Color(0xFF111827),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: exposureColor.withOpacity(0.2),
+                                                        blurRadius: 4,
+                                                        offset: const Offset(0, 2),
+                                                      )
+                                                    ]
+                                                ),
+                                                child: Text(
+                                                  _doseMessage.toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w800,
+                                                    fontSize: 12,
+                                                    color: exposureColor,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
                                     ),
+
+                                    const SizedBox(height: 32),
+
+                                    /// STRUCTURED STATS ROW
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: IntrinsicHeight(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            _statTile(PhosphorIconsBold.timer, "Today", _formatDuration(_totalExposure)),
+                                            VerticalDivider(color: Colors.grey.shade200, thickness: 1),
+                                            _statTile(PhosphorIconsBold.personSimpleWalk, "Session", _formatDuration(_currentSession)),
+                                            VerticalDivider(color: Colors.grey.shade200, thickness: 1),
+                                            _statTile(PhosphorIconsBold.house, "Home", _distanceToHomeText()),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    /// AQI CARD
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(PhosphorIconsBold.mapPin, color: Colors.grey.shade700),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  "AQI from: ${_aqiLocationName ?? "..."}",
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey.shade500,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  "${_lastKnownAqi?.round() ?? "--"} AQI",
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF111827),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    )
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
 
-                    const SizedBox(height: 24),
+                              const SizedBox(height: 24),
 
-                    // Status indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.wifi_tethering, color: Colors.white.withOpacity(0.7), size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Real-time monitoring active',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                              /// REAL-TIME STATUS CARD (New Addition)
+                              _buildRealTimeStatusCard(),
 
-                    const SizedBox(height: 30),
+                              const SizedBox(height: 24),
 
-                    // Action Buttons
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _setHomeToCurrentLocation,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: gradientColors[0],
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                elevation: 0,
+                              /// SET HOME CARD
+                              _actionCard(
+                                title: "Home Location",
+                                icon: PhosphorIconsBold.house,
+                                buttonText: "Set Home Here",
+                                onPressed: _setHomeToCurrentLocation,
                               ),
-                              icon: const Icon(Icons.my_location),
-                              label: const Text(
-                                'Set Home Here',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          if (_homeLat != null && _homeLng != null) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: _clearHome,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: const BorderSide(color: Colors.white, width: 2),
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
+
+                              if (_homeLat != null && _homeLng != null) ...[
+                                const SizedBox(height: 12),
+                                _secondaryButton("Clear Home", _clearHome),
+                              ],
+
+                              const SizedBox(height: 16),
+
+                              /// SAFE ZONE BUTTON (Clean Outline)
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _setSafeZoneToCurrentLocation,
+                                  icon: const PhosphorIcon(PhosphorIconsBold.shieldCheck, size: 20),
+                                  label: const Text(
+                                    "Set Current Place as Safe Zone",
+                                    style: TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    foregroundColor: const Color(0xFF111827),
+                                    side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
                                 ),
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text(
-                                  'Clear Home',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          Text(
-                            _status,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    const SizedBox(height: 20),
+                              const SizedBox(height: 16),
 
-                    // Recovery Button Section
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.healing, color: Colors.white.withOpacity(0.9), size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Recovery Plan',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              /// RECOVERY CARD
+                              _actionCard(
+                                title: "Recovery Plan",
+                                icon: PhosphorIconsBold.arrowClockwise,
+                                buttonText: "Generate Recovery",
+                                color: const Color(0xFF4B5563), // Slate Grey
+                                onPressed: () {
+                                  RecoveryModule.launch(
+                                    context,
+                                    pollutionDose: _pollutionDose.toInt(),
+                                    doseMessage: _doseMessage,
+                                  );
+                                },
                               ),
+
+                              const SizedBox(height: 16),
+
+                              /// COMMUNITY CARD
+                              _actionCard(
+                                title: "Community Forum",
+                                icon: PhosphorIconsBold.users,
+                                buttonText: "Join Community",
+                                color: const Color(0xFF0F766E), // Deep Medical Teal
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const CommunityScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 32),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                RecoveryModule.launch(
-                                  context,
-                                  pollutionDose: _pollutionDose.toInt(),
-                                  doseMessage: _doseMessage,
-                                );
-                              },
-                              icon: const Icon(Icons.healing),
-                              label: const Text(
-                                'Generate Recovery',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Analytics Button Section
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.analytics_outlined, color: Colors.white.withOpacity(0.9), size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Insights & Trends',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () => AnalyticsModule.launch(context),
-                              icon: const Icon(Icons.analytics_outlined),
-                              label: const Text(
-                                'View Analytics',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    const SizedBox(height: 20),
+                      /// PREDICT TAB
+                      Container(color: Colors.white, child: const AnalyticsScreen()),
 
-                    // Community Button Section
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.people, color: Colors.white.withOpacity(0.9), size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Community Forum',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const CommunityScreen()),
-                                );
-                              },
-                              icon: const Icon(Icons.people),
-                              label: const Text(
-                                'Join Community',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                      /// MAP TAB
+                      Container(color: Colors.white, child: const MapScreen()),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  // --- REFINED HELPER WIDGETS ---
+
+  Widget _statTile(IconData icon, String title, String value) {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          PhosphorIcon(icon, size: 22, color: const Color(0xFF6B7280)),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+  Widget _buildRealTimeStatusCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.blue.shade100, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          /// HEADER
+          Row(
+            children: [
+              const PhosphorIcon(PhosphorIconsBold.broadcast, color: Color(0xFF2563EB), size: 20),
+              const SizedBox(width: 10),
+              const Text(
+                "Real-time monitoring active",
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const Spacer(),
+              // A small "Live" indicator dot
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF22C55E), // Green
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: Color(0xFFF3F4F6)),
+          ),
+
+          /// STATUS MESSAGES
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const PhosphorIcon(PhosphorIconsBold.info, color: Color(0xFF9CA3AF), size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _status,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4B5563),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Using the existing _distanceToHomeText() logic
+                    Text(
+                      "Distance to Home: ${_distanceToHomeText()}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Placeholder for the missing sensor distance logic
+                    const Text(
+                      "AQI sensor distance: -- m away",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _actionCard({
+    required String title,
+    required IconData icon,
+    required String buttonText,
+    required VoidCallback onPressed,
+    // Default changed to a premium Deep Navy instead of bright blue
+    Color color = const Color(0xFF1E293B),
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14), // Sharper, cleaner corners
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
+        border: Border.all(color: Colors.grey.shade100, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6F8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: PhosphorIcon(icon, size: 20, color: const Color(0xFF111827)),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: Color(0xFF111827),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10), // Structured button
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _secondaryButton(String text, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          foregroundColor: const Color(0xFFEF4444), // Red for clear/delete actions
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _manualAqiRefresh() async {
+    try {
+      // 1. Get current position
+      final pos = await _loc.getCurrentPosition();
+
+      // 2. Fetch AQI from your existing service
+      final aqiResult = await _pollution.getAqiForLocation(pos.latitude, pos.longitude);
+
+      if (!mounted) return;
+
+      // 3. Update the state variables used by the AQI Card
+      setState(() {
+        _currentPosition = pos;
+        _lastKnownAqi = aqiResult.aqi;
+        _aqiLocationName = aqiResult.locationName;
+        _status = 'Manual Refresh: ${aqiResult.status}';
+      });
+    } catch (e) {
+      setState(() => _status = 'Manual refresh failed: $e');
+    }
   }
 }

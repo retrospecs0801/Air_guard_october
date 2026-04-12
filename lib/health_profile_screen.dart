@@ -1,5 +1,6 @@
 // lib/health_profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class HealthProfileScreen extends StatefulWidget {
   const HealthProfileScreen({super.key});
@@ -11,7 +12,14 @@ class HealthProfileScreen extends StatefulWidget {
 class _HealthProfileScreenState extends State<HealthProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Respiratory Health
+  // Guidelines Colors [cite: 7, 9]
+  final Color _bgScaffold = const Color(0xFFF4F6F8);
+  final Color _primaryNavy = const Color(0xFF1E293B);
+  final Color _medicalTeal = const Color(0xFF0F766E);
+  final Color _textPrimary = const Color(0xFF111827);
+  final Color _textSecondary = const Color(0xFF6B7280);
+
+  // Form State variables [cite: 24, 25, 26, 31, 33, 34]
   bool hasAsthma = false;
   String asthmaSeverity = 'Mild';
   bool hasCOPD = false;
@@ -21,8 +29,6 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
   bool hasPneumoniaHistory = false;
   bool hasSleepApnea = false;
   int age = 25;
-
-  // Smoking & Exposure
   String smokingStatus = 'Non-smoker';
   int cigarettesPerDay = 0;
   int yearsQuit = 0;
@@ -30,25 +36,6 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
   bool passiveSmoking = false;
   bool occupationalExposure = false;
   String occupationType = '';
-
-  // Physical Activity
-  bool outdoorWalking = false;
-  int walkingMinutes = 0;
-  bool cycling = false;
-  int cyclingMinutes = 0;
-  bool running = false;
-  int runningMinutes = 0;
-  bool outdoorSports = false;
-  String sportsType = '';
-
-  bool gymWorkout = false;
-  int gymMinutes = 0;
-  bool yogaBreathing = false;
-  int yogaMinutes = 0;
-  bool swimming = false;
-  int swimmingMinutes = 0;
-
-  // Indoor Environment
   bool hasAirPurifier = false;
   int purifierHours = 0;
   int indoorPlants = 0;
@@ -56,13 +43,9 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
   String ventilationQuality = 'Good';
   bool usesIncense = false;
   int incenseFrequency = 0;
-
-  // Commute
   String commuteMode = 'Personal Vehicle';
   int commuteMinutes = 0;
   String trafficDensity = 'Moderate';
-
-  // Diet & Lifestyle
   double waterIntake = 2.0;
   String dietQuality = 'Balanced';
   bool drinksGreenTea = false;
@@ -74,117 +57,88 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1a1a2e),
+      backgroundColor: _bgScaffold,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF16213e),
+        backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(PhosphorIconsBold.caretLeft, color: _primaryNavy),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Health Profile',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.w800, // Uses Inter Bold [cite: 12]
+            letterSpacing: 0.3,
+          ),
         ),
+        shape: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1)),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           children: [
-            _buildSectionHeader('🫁 Respiratory Health', Icons.medical_services),
+            _buildSectionHeader('Respiratory Health', PhosphorIconsBold.heartbeat),
             _buildCard([
               _buildSwitchTile('Asthma', hasAsthma, (val) => setState(() => hasAsthma = val)),
               if (hasAsthma) _buildDropdown('Severity', asthmaSeverity, ['Mild', 'Moderate', 'Severe'], (val) => setState(() => asthmaSeverity = val!)),
+              const Divider(),
               _buildSwitchTile('COPD', hasCOPD, (val) => setState(() => hasCOPD = val)),
+              const Divider(),
               _buildSwitchTile('Bronchitis', hasBronchitis, (val) => setState(() => hasBronchitis = val)),
+              const Divider(),
               _buildSwitchTile('Allergies', hasAllergies, (val) => setState(() => hasAllergies = val)),
-              if (hasAllergies) _buildTextField('Allergy Types (e.g., dust, pollen)', allergyTypes, (val) => allergyTypes = val),
-              _buildSwitchTile('Previous Pneumonia', hasPneumoniaHistory, (val) => setState(() => hasPneumoniaHistory = val)),
-              _buildSwitchTile('Sleep Apnea', hasSleepApnea, (val) => setState(() => hasSleepApnea = val)),
+              if (hasAllergies) _buildTextField('Allergy Types (dust, pollen)', allergyTypes, (val) => allergyTypes = val),
+              const Divider(),
               _buildSlider('Age', age.toDouble(), 1, 100, (val) => setState(() => age = val.toInt()), suffix: ' years'),
             ]),
 
-            const SizedBox(height: 24),
-            _buildSectionHeader('🚬 Smoking & Exposure', Icons.smoking_rooms),
+            const SizedBox(height: 32),
+            _buildSectionHeader('Smoking & Exposure', PhosphorIconsBold.prohibit),
             _buildCard([
               _buildDropdown('Smoking Status', smokingStatus, ['Non-smoker', 'Current Smoker', 'Ex-smoker', 'Vaper'], (val) => setState(() => smokingStatus = val!)),
               if (smokingStatus == 'Current Smoker') _buildSlider('Cigarettes per Day', cigarettesPerDay.toDouble(), 0, 40, (val) => setState(() => cigarettesPerDay = val.toInt()), suffix: ' cigs'),
-              if (smokingStatus == 'Ex-smoker') _buildSlider('Years Since Quit', yearsQuit.toDouble(), 0, 50, (val) => setState(() => yearsQuit = val.toInt()), suffix: ' years'),
-              _buildSwitchTile('Vaping/E-cigarettes', usesVape, (val) => setState(() => usesVape = val)),
-              _buildSwitchTile('Passive Smoking Exposure', passiveSmoking, (val) => setState(() => passiveSmoking = val)),
-              _buildSwitchTile('Occupational Exposure', occupationalExposure, (val) => setState(() => occupationalExposure = val)),
+              const Divider(),
+              _buildSwitchTile('Passive Exposure', passiveSmoking, (val) => setState(() => passiveSmoking = val)),
+              const Divider(),
+              _buildSwitchTile('Occupational Hazard', occupationalExposure, (val) => setState(() => occupationalExposure = val)),
               if (occupationalExposure) _buildTextField('Occupation Type', occupationType, (val) => occupationType = val),
             ]),
 
-            const SizedBox(height: 24),
-            _buildSectionHeader('🏃 Outdoor Physical Activity', Icons.directions_run),
-            _buildCard([
-              _buildSwitchTile('Walking/Jogging', outdoorWalking, (val) => setState(() => outdoorWalking = val)),
-              if (outdoorWalking) _buildSlider('Minutes per Day', walkingMinutes.toDouble(), 0, 180, (val) => setState(() => walkingMinutes = val.toInt()), suffix: ' min'),
-              _buildSwitchTile('Cycling', cycling, (val) => setState(() => cycling = val)),
-              if (cycling) _buildSlider('Minutes per Day', cyclingMinutes.toDouble(), 0, 180, (val) => setState(() => cyclingMinutes = val.toInt()), suffix: ' min'),
-              _buildSwitchTile('Running', running, (val) => setState(() => running = val)),
-              if (running) _buildSlider('Minutes per Day', runningMinutes.toDouble(), 0, 180, (val) => setState(() => runningMinutes = val.toInt()), suffix: ' min'),
-              _buildSwitchTile('Outdoor Sports', outdoorSports, (val) => setState(() => outdoorSports = val)),
-              if (outdoorSports) _buildTextField('Sport Type', sportsType, (val) => sportsType = val),
-            ]),
-
-            const SizedBox(height: 24),
-            _buildSectionHeader('💪 Indoor Exercise', Icons.fitness_center),
-            _buildCard([
-              _buildSwitchTile('Gym/Indoor Workout', gymWorkout, (val) => setState(() => gymWorkout = val)),
-              if (gymWorkout) _buildSlider('Minutes per Day', gymMinutes.toDouble(), 0, 180, (val) => setState(() => gymMinutes = val.toInt()), suffix: ' min'),
-              _buildSwitchTile('Yoga/Breathing Exercises', yogaBreathing, (val) => setState(() => yogaBreathing = val)),
-              if (yogaBreathing) _buildSlider('Minutes per Day', yogaMinutes.toDouble(), 0, 180, (val) => setState(() => yogaMinutes = val.toInt()), suffix: ' min'),
-              _buildSwitchTile('Swimming', swimming, (val) => setState(() => swimming = val)),
-              if (swimming) _buildSlider('Minutes per Day', swimmingMinutes.toDouble(), 0, 180, (val) => setState(() => swimmingMinutes = val.toInt()), suffix: ' min'),
-            ]),
-
-            const SizedBox(height: 24),
-            _buildSectionHeader('🏠 Indoor Environment', Icons.home),
+            const SizedBox(height: 32),
+            _buildSectionHeader('Indoor Environment', PhosphorIconsBold.houseLine),
             _buildCard([
               _buildSwitchTile('Air Purifier', hasAirPurifier, (val) => setState(() => hasAirPurifier = val)),
-              if (hasAirPurifier) _buildSlider('Hours per Day', purifierHours.toDouble(), 0, 24, (val) => setState(() => purifierHours = val.toInt()), suffix: ' hrs'),
-              _buildSlider('Indoor Plants', indoorPlants.toDouble(), 0, 20, (val) => setState(() => indoorPlants = val.toInt()), suffix: ' plants'),
+              if (hasAirPurifier) _buildSlider('Hours active', purifierHours.toDouble(), 0, 24, (val) => setState(() => purifierHours = val.toInt()), suffix: ' hrs'),
+              const Divider(),
               _buildDropdown('Cooking Method', cookingMethod, ['Electric/Induction', 'Gas Stove', 'Mixed'], (val) => setState(() => cookingMethod = val!)),
-              _buildDropdown('Ventilation Quality', ventilationQuality, ['Good', 'Moderate', 'Poor'], (val) => setState(() => ventilationQuality = val!)),
-              _buildSwitchTile('Uses Incense/Candles', usesIncense, (val) => setState(() => usesIncense = val)),
-              if (usesIncense) _buildSlider('Times per Week', incenseFrequency.toDouble(), 0, 14, (val) => setState(() => incenseFrequency = val.toInt()), suffix: ' times'),
+              const Divider(),
+              _buildSlider('Indoor Plants', indoorPlants.toDouble(), 0, 20, (val) => setState(() => indoorPlants = val.toInt()), suffix: ' plants'),
             ]),
 
-            const SizedBox(height: 24),
-            _buildSectionHeader('🚗 Daily Commute', Icons.commute),
-            _buildCard([
-              _buildDropdown('Commute Mode', commuteMode, ['Walking/Cycling', 'Public Transport', 'Personal Vehicle', 'Work From Home'], (val) => setState(() => commuteMode = val!)),
-              if (commuteMode != 'Work From Home') _buildSlider('Commute Duration', commuteMinutes.toDouble(), 0, 180, (val) => setState(() => commuteMinutes = val.toInt()), suffix: ' min'),
-              if (commuteMode != 'Work From Home') _buildDropdown('Traffic Density', trafficDensity, ['Light', 'Moderate', 'Heavy'], (val) => setState(() => trafficDensity = val!)),
-            ]),
-
-            const SizedBox(height: 24),
-            _buildSectionHeader('🍎 Diet & Lifestyle', Icons.restaurant),
-            _buildCard([
-              _buildSlider('Water Intake', waterIntake, 0, 5, (val) => setState(() => waterIntake = val), divisions: 20, suffix: ' L/day'),
-              _buildDropdown('Diet Quality', dietQuality, ['Processed Heavy', 'Balanced', 'Antioxidant Rich'], (val) => setState(() => dietQuality = val!)),
-              _buildSwitchTile('Drinks Green Tea', drinksGreenTea, (val) => setState(() => drinksGreenTea = val)),
-              _buildSlider('Sleep Hours', sleepHours.toDouble(), 3, 12, (val) => setState(() => sleepHours = val.toInt()), suffix: ' hrs'),
-              _buildDropdown('Stress Level', stressLevel, ['Low', 'Medium', 'High'], (val) => setState(() => stressLevel = val!)),
-              _buildDropdown('Mask Usage When Outside', maskUsage, ['None', 'Cloth', 'Surgical', 'N95'], (val) => setState(() => maskUsage = val!)),
-              _buildSwitchTile('Opens Windows Frequently', opensWindows, (val) => setState(() => opensWindows = val)),
-            ]),
-
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryNavy,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'SAVE HEALTH PROFILE',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                ),
               ),
-              child: const Text('Save Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -193,14 +147,22 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
 
   Widget _buildSectionHeader(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: const EdgeInsets.only(bottom: 16.0, left: 4),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white70, size: 24),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Icon(icon, color: _medicalTeal, size: 20),
+          ),
+          const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -210,26 +172,35 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
   Widget _buildCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0f3460),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.shade100, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(children: children),
     );
   }
 
   Widget _buildSwitchTile(String label, bool value, Function(bool) onChanged) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.all(16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
-          Switch(
+          Text(
+            label,
+            style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          Switch.adaptive(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF4CAF50),
+            activeColor: _medicalTeal,
           ),
         ],
       ),
@@ -238,22 +209,25 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
 
   Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: value,
             decoration: InputDecoration(
               filled: true,
-              fillColor: const Color(0xFF1a1a2e),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              fillColor: _bgScaffold,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
             ),
-            dropdownColor: const Color(0xFF1a1a2e),
-            style: const TextStyle(color: Colors.white),
+            icon: Icon(PhosphorIconsBold.caretDown, size: 16, color: _primaryNavy),
+            style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
             items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
             onChanged: onChanged,
           ),
@@ -264,44 +238,50 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
 
   Widget _buildTextField(String label, String initialValue, Function(String) onChanged) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
       child: TextFormField(
         initialValue: initialValue,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: _textPrimary, fontSize: 15),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.white70),
+          labelStyle: TextStyle(color: _textSecondary, fontSize: 13),
           filled: true,
-          fillColor: const Color(0xFF1a1a2e),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          fillColor: _bgScaffold,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _buildSlider(String label, double value, double min, double max, Function(double) onChanged, {int? divisions, String suffix = ''}) {
+  Widget _buildSlider(String label, double value, double min, double max, Function(double) onChanged, {String suffix = ''}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-              Text('${value.toStringAsFixed(divisions != null ? 1 : 0)}$suffix', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '${value.toInt()}$suffix',
+                style: TextStyle(color: _medicalTeal, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+              ),
             ],
           ),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions ?? (max - min).toInt(),
-            activeColor: const Color(0xFF4CAF50),
-            inactiveColor: Colors.white24,
-            onChanged: onChanged,
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: _medicalTeal,
+              inactiveTrackColor: Colors.grey.shade200,
+              thumbColor: Colors.white,
+              trackHeight: 4,
+            ),
+            child: Slider(value: value, min: min, max: max, onChanged: onChanged),
           ),
         ],
       ),
@@ -310,11 +290,12 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
 
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
-      // TODO: Save to storage/database
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved successfully!'),
-          backgroundColor: Color(0xFF4CAF50),
+        SnackBar(
+          content: const Text('Profile saved successfully', style: TextStyle(fontWeight: FontWeight.w600)),
+          backgroundColor: _primaryNavy,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       Navigator.pop(context);

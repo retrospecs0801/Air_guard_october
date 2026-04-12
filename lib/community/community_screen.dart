@@ -1,12 +1,11 @@
-// =============================================================================
-// FILE: lib/community/community_screen.dart
-// Single file implementation for Community feature
-// =============================================================================
+// lib/community/community_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../screens/community/policy_simulation_tab.dart';
 
 // =============================================================================
-// DATA MODEL
+// DATA MODEL & SERVICE (Moved from original chat file)
 // =============================================================================
 class CommunityMessage {
   final String id;
@@ -28,7 +27,6 @@ class CommunityMessage {
   String get formattedTime {
     final now = DateTime.now();
     final diff = now.difference(timestamp);
-
     if (diff.inMinutes < 1) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
@@ -37,9 +35,6 @@ class CommunityMessage {
   }
 }
 
-// =============================================================================
-// MOCK DATA SERVICE
-// =============================================================================
 class _MessageService {
   static List<CommunityMessage> _messages = [];
 
@@ -66,64 +61,22 @@ class _MessageService {
         id: '1',
         userName: 'Priya Sharma',
         userAvatar: '👩',
-        message: 'The air quality in Gomti Nagar is terrible today. My kids couldn\'t play outside. We need better monitoring systems!',
+        message: 'The air quality in Gomti Nagar is terrible today.',
         timestamp: now.subtract(const Duration(hours: 2)),
       ),
       CommunityMessage(
         id: '2',
         userName: 'Rahul Verma',
         userAvatar: '👨',
-        message: 'I\'ve started using N95 masks daily. It helps a lot. Also doing breathing exercises from this app!',
+        message: 'I\'ve started using N95 masks daily. It helps a lot.',
         timestamp: now.subtract(const Duration(hours: 5)),
-      ),
-      CommunityMessage(
-        id: '3',
-        userName: 'Anjali Singh',
-        userAvatar: '👧',
-        message: 'Does anyone know if the government is planning to increase green cover? We desperately need more trees in our area.',
-        timestamp: now.subtract(const Duration(hours: 8)),
-      ),
-      CommunityMessage(
-        id: '4',
-        userName: 'Amit Kumar',
-        userAvatar: '🧑',
-        message: 'Saw heavy smoke near Alambagh today. Industrial emissions are getting worse. Someone should report this.',
-        timestamp: now.subtract(const Duration(days: 1)),
-      ),
-      CommunityMessage(
-        id: '5',
-        userName: 'Neha Gupta',
-        userAvatar: '👩‍💼',
-        message: 'My elderly parents are struggling with the pollution. What recovery methods work best for seniors?',
-        timestamp: now.subtract(const Duration(days: 1, hours: 3)),
-      ),
-      CommunityMessage(
-        id: '6',
-        userName: 'Vikram Yadav',
-        userAvatar: '👨‍💼',
-        message: 'We should organize a community plantation drive this weekend. Who\'s interested?',
-        timestamp: now.subtract(const Duration(days: 2)),
-      ),
-      CommunityMessage(
-        id: '7',
-        userName: 'Sunita Devi',
-        userAvatar: '👵',
-        message: 'Indoor air purifiers helped my family a lot. Also keeping windows closed during peak pollution hours.',
-        timestamp: now.subtract(const Duration(days: 2, hours: 5)),
-      ),
-      CommunityMessage(
-        id: '8',
-        userName: 'Rohan Mishra',
-        userAvatar: '🧔',
-        message: 'This app is really helpful! The recovery tracker motivated me to take pollution seriously.',
-        timestamp: now.subtract(const Duration(days: 3)),
       ),
     ];
   }
 }
 
 // =============================================================================
-// MAIN COMMUNITY SCREEN
+// MAIN TABBED SCREEN
 // =============================================================================
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -132,7 +85,89 @@ class CommunityScreen extends StatefulWidget {
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
+class _CommunityScreenState extends State<CommunityScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            backgroundColor: const Color(0xFFF4F6F8),
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            floating: true,
+            snap: true,
+            pinned: true,
+            title: const Text(
+              'Community',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+                letterSpacing: 0.3,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(44),
+              child: Container(
+                color: const Color(0xFFF4F6F8),
+                child: TabBar(
+                  controller: _tabController,
+                  labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  labelColor: const Color(0xFF1E293B),
+                  unselectedLabelColor: const Color(0xFF9CA3AF),
+                  indicatorColor: const Color(0xFF0F766E),
+                  indicatorWeight: 2.5,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  tabs: const [
+                    Tab(text: 'Discussion'),
+                    Tab(text: 'Policy Sim'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: const [
+            _DiscussionTab(), // Integrated Chat UI
+            PolicySimulationTab(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// INTEGRATED DISCUSSION TAB (Original Chat logic)
+// =============================================================================
+class _DiscussionTab extends StatefulWidget {
+  const _DiscussionTab();
+
+  @override
+  State<_DiscussionTab> createState() => _DiscussionTabState();
+}
+
+class _DiscussionTabState extends State<_DiscussionTab> {
   late List<CommunityMessage> _messages;
   final _textController = TextEditingController();
   bool _hasText = false;
@@ -167,103 +202,25 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(child: _buildMessageList()),
-            _buildMessageInput(),
-          ],
-        ),
-      ),
+    return Column(
+      children: [
+        Expanded(child: _buildMessageList()),
+        _buildMessageInput(),
+      ],
     );
   }
 
-  // Header widget
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green.shade400, Colors.teal.shade500],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.people, color: Colors.white, size: 32),
-              const SizedBox(width: 12),
-              Text(
-                'Community',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Let\'s create a community to discuss the effects and make our city better',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withOpacity(0.95),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.info_outline, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  'Share your views and concerns',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Message list
   Widget _buildMessageList() {
     if (_messages.isEmpty) {
-      return const Center(
-        child: Text('No messages yet. Start the conversation!'),
-      );
+      return const Center(child: Text('No messages yet. Start the conversation!'));
     }
-
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 16, bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        return _buildMessageBubble(_messages[index]);
-      },
+      itemBuilder: (context, index) => _buildMessageBubble(_messages[index]),
     );
   }
 
-  // Individual message bubble
   Widget _buildMessageBubble(CommunityMessage message) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -271,9 +228,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            backgroundColor: message.isCurrentUser
-                ? Colors.green.shade200
-                : Colors.blue.shade100,
+            backgroundColor: message.isCurrentUser ? Colors.green.shade200 : Colors.blue.shade100,
             child: Text(message.userAvatar, style: const TextStyle(fontSize: 20)),
           ),
           const SizedBox(width: 12),
@@ -283,41 +238,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      message.userName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
+                    Text(message.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(width: 8),
-                    Text(
-                      message.formattedTime,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
-                    ),
+                    Text(message.formattedTime, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: message.isCurrentUser
-                        ? Colors.green.shade50
-                        : Colors.grey.shade100,
+                    color: message.isCurrentUser ? Colors.green.shade50 : Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: message.isCurrentUser
-                          ? Colors.green.shade200
-                          : Colors.grey.shade300,
-                    ),
+                    border: Border.all(color: message.isCurrentUser ? Colors.green.shade200 : Colors.grey.shade300),
                   ),
-                  child: Text(
-                    message.message,
-                    style: const TextStyle(fontSize: 14, height: 1.4),
-                  ),
+                  child: Text(message.message, style: const TextStyle(fontSize: 14, height: 1.4)),
                 ),
               ],
             ),
@@ -327,19 +261,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // Message input field
   Widget _buildMessageInput() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))],
       ),
       child: Row(
         children: [
@@ -350,25 +277,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 hintText: 'Share your thoughts...',
                 filled: true,
                 fillColor: Colors.grey.shade100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              maxLines: null,
-              textCapitalization: TextCapitalization.sentences,
             ),
           ),
           const SizedBox(width: 8),
-          FloatingActionButton(
-            mini: true,
+          IconButton(
             onPressed: _hasText ? _handleSendMessage : null,
-            backgroundColor: _hasText ? Colors.green : Colors.grey.shade300,
-            child: const Icon(Icons.send, size: 20),
+            icon: Icon(Icons.send, color: _hasText ? Colors.green : Colors.grey),
           ),
         ],
       ),
@@ -381,4 +298,3 @@ class _CommunityScreenState extends State<CommunityScreen> {
     super.dispose();
   }
 }
-
