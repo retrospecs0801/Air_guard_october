@@ -1,8 +1,8 @@
 # 🚀 Project README
-### Team Name- yusufhabibyh4
+### Team Name- Encore
 #### Project Name- AirGuard
 #### Problem Statement (P)- Lack of real-time, personalized awareness of individual pollution exposure inhighly polluted urban environments
-#### Track- Open innovation ("build for bharat")
+#### Track- healthcare for all
 #### Team Members
 Yusuf Habib – Backend Developer <br>
 Anushka Srivastava – Research & Strategy Lead <br>
@@ -16,7 +16,7 @@ This app helps users understand how much polluted air they personally breathe ev
 At the end of the day, the app also generates a personalized recovery plan (breathing + diet suggestions) using the Gemini API.
 
 ---
-# link for testing  [https://jocular-taffy-92e528.netlify.app/]
+# link for testing  [https://fantastic-strudel-e7fa76.netlify.app/]
 ## 📚Table of Contents  
 - [Features](#features)
 - [Tech Stack & Dependencies](#tech-stack--dependencies)  
