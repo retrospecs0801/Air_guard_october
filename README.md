@@ -1,13 +1,4 @@
-# 🚀 Project README
-### Team Name- Encore
-#### Project Name- AirGuard
-#### Problem Statement (P)- Lack of real-time, personalized awareness of individual pollution exposure inhighly polluted urban environments
-#### Track- healthcare for all
-#### Team Members
-Yusuf Habib – Backend Developer <br>
-Anushka Srivastava – Research & Strategy Lead <br>
-Saumya Verma – Frontend & Designing <br>
-Mohd Adnan Khan – Testing & QA Lead <br>
+
 ## 🌍AirGuard  
 *Real-Time Air Quality Monitoring & Alert System*
 Even in the same city, people experience different pollution exposure. Someone who spends more time outdoors breathes far more polluted air than someone mostly indoors. <br>
