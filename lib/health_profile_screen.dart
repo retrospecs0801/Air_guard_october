@@ -1,6 +1,5 @@
 // lib/health_profile_screen.dart
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class HealthProfileScreen extends StatefulWidget {
   const HealthProfileScreen({super.key});
@@ -63,7 +62,7 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
         elevation: 0,
         centerTitle: false,
         leading: IconButton(
-          icon: Icon(PhosphorIconsBold.caretLeft, color: _primaryNavy),
+          icon: Icon(Icons.chevron_left, color: _primaryNavy),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -82,7 +81,7 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           children: [
-            _buildSectionHeader('Respiratory Health', PhosphorIconsBold.heartbeat),
+            _buildSectionHeader('Respiratory Health', Icons.monitor_heart),
             _buildCard([
               _buildSwitchTile('Asthma', hasAsthma, (val) => setState(() => hasAsthma = val)),
               if (hasAsthma) _buildDropdown('Severity', asthmaSeverity, ['Mild', 'Moderate', 'Severe'], (val) => setState(() => asthmaSeverity = val!)),
@@ -98,7 +97,7 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
             ]),
 
             const SizedBox(height: 32),
-            _buildSectionHeader('Smoking & Exposure', PhosphorIconsBold.prohibit),
+            _buildSectionHeader('Smoking & Exposure', Icons.block),
             _buildCard([
               _buildDropdown('Smoking Status', smokingStatus, ['Non-smoker', 'Current Smoker', 'Ex-smoker', 'Vaper'], (val) => setState(() => smokingStatus = val!)),
               if (smokingStatus == 'Current Smoker') _buildSlider('Cigarettes per Day', cigarettesPerDay.toDouble(), 0, 40, (val) => setState(() => cigarettesPerDay = val.toInt()), suffix: ' cigs'),
@@ -110,7 +109,7 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
             ]),
 
             const SizedBox(height: 32),
-            _buildSectionHeader('Indoor Environment', PhosphorIconsBold.houseLine),
+            _buildSectionHeader('Indoor Environment', Icons.house_outlined),
             _buildCard([
               _buildSwitchTile('Air Purifier', hasAirPurifier, (val) => setState(() => hasAirPurifier = val)),
               if (hasAirPurifier) _buildSlider('Hours active', purifierHours.toDouble(), 0, 24, (val) => setState(() => purifierHours = val.toInt()), suffix: ' hrs'),
@@ -226,7 +225,7 @@ class _HealthProfileScreenState extends State<HealthProfileScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
             ),
-            icon: Icon(PhosphorIconsBold.caretDown, size: 16, color: _primaryNavy),
+            icon: Icon(Icons.keyboard_arrow_down, size: 16, color: _primaryNavy),
             style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
             items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
             onChanged: onChanged,

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../models/policy_model.dart';
 
 class PolicyInsightCard extends StatelessWidget {
@@ -48,7 +47,7 @@ class PolicyInsightCard extends StatelessWidget {
             child: Column(
               children: [
                 _InsightRow(
-                  icon: PhosphorIconsBold.arrowDown,
+                  icon: Icons.arrow_downward,
                   iconColor: const Color(0xFF0F766E),
                   label: 'Primary Driver',
                   value:
@@ -56,7 +55,7 @@ class PolicyInsightCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _InsightRow(
-                  icon: PhosphorIconsBold.atom,
+                  icon: Icons.science,
                   iconColor: const Color(0xFF6366F1),
                   label: 'Secondary Effect',
                   value: result.secondaryEffect,
@@ -152,7 +151,7 @@ class _AqiBeforeAfter extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Icon(
-              PhosphorIconsBold.arrowRight,
+              Icons.arrow_forward,
               size: 12,
               color: const Color(0xFF9CA3AF),
             ),
@@ -362,8 +361,8 @@ class _NarrativeSection extends StatelessWidget {
             children: [
               Icon(
                 result.isAiGenerated
-                    ? PhosphorIconsBold.sparkle
-                    : PhosphorIconsBold.info,
+                    ? Icons.auto_awesome
+                    : Icons.info_outline,
                 size: 12,
                 color: result.isAiGenerated
                     ? const Color(0xFF6366F1)

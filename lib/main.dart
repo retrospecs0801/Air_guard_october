@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'services/location_service.dart';
 import 'services/storage_service.dart';
 import 'services/exposure_service.dart';
@@ -17,48 +19,34 @@ import 'analytics/analytics_screen.dart';
 import 'health_profile_screen.dart';
 import 'map/map_screen.dart';
 
-import 'package:phosphor_flutter/phosphor_flutter.dart';
-
-void main() {
-  runApp(const ExposureApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final themeController = await ThemeController.load();
+  runApp(ExposureApp(themeController: themeController));
 }
 
 class ExposureApp extends StatelessWidget {
-  const ExposureApp({super.key});
+  final ThemeController? themeController;
+
+  const ExposureApp({super.key, this.themeController});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Exposure - Set Home & Auto Counter',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Inter', // Global default
-
-        // This section defines the "defaults" for different types of text
-        textTheme: const TextTheme(
-          // For "Pollution Exposure" Header (22px, w800)
-          headlineMedium: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800, // Will use your Bold ttf
-            color: Color(0xFF111827),
-          ),
-          // For the Large Score (56px)
-          displayLarge: TextStyle(
-            fontSize: 56,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.0,
-            color: Color(0xFF111827),
-          ),
-          // For Body labels (Today, Session, etc.)
-          bodySmall: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500, // Will use your Medium ttf
-            color: Color(0xFF6B7280),
-          ),
-        ),
-      ),
-      home: const HomeScreen(),
+    final controller = themeController;
+    if (controller == null) return _buildMaterialApp(ThemeMode.system);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => _buildMaterialApp(controller.themeMode),
     );
   }
+
+  Widget _buildMaterialApp(ThemeMode themeMode) => MaterialApp(
+    title: 'Exposure - Set Home & Auto Counter',
+    theme: AppTheme.light,
+    darkTheme: AppTheme.dark,
+    themeMode: themeMode,
+    home: const HomeScreen(),
+  );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -67,8 +55,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   Future<void> _setSafeZoneToCurrentLocation() async {
     setState(() => _status = 'Updating safe zone to current location...');
     try {
@@ -126,11 +114,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Duration _currentSession = Duration.zero;
 
   // UI state for pollution
-  double? _lastKnownAqi;
+  double? _lastKnownAqi = PollutionService.fallbackAqi;
   double? _currentAqi;
   double _pollutionDose = 0.0;
   String _doseMessage = 'Low';
-  String? _aqiLocationName;
+  String? _aqiLocationName = 'Fallback estimate';
+  bool _isAqiFallback = true;
 
   late AnimationController _pulseController;
 
@@ -177,26 +166,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       return;
     }
 
-    _posSub = _loc.positionStream(accuracy: LocationAccuracy.best, distanceFilter: 0)
-        .listen((pos) async {
-      setState(() {
-        _currentPosition = pos;
-        _status = 'Location updated';
-      });
+    _posSub = _loc
+        .positionStream(accuracy: LocationAccuracy.best, distanceFilter: 0)
+        .listen(
+          (pos) async {
+            setState(() {
+              _currentPosition = pos;
+              _status = 'Location updated';
+            });
 
-      if (_currentAqi == null && !_isInside) {
-        final aqiResult = await _pollution.getAqiForLocation(pos.latitude, pos.longitude);
-        if (!mounted) return;
-        setState(() {
-          _currentAqi = aqiResult.aqi;
-          _lastKnownAqi = aqiResult.aqi;
-          _aqiLocationName = aqiResult.locationName;
-          _status = aqiResult.status;
-        });
-      }
-    }, onError: (e) {
-      setState(() => _status = 'Position stream error: $e');
-    });
+            if (_currentAqi == null && !_isInside) {
+              final aqiResult = await _pollution.getAqiForLocation(
+                pos.latitude,
+                pos.longitude,
+              );
+              if (!mounted) return;
+              setState(() {
+                _currentAqi = aqiResult.aqi;
+                _lastKnownAqi = aqiResult.aqi;
+                _aqiLocationName = aqiResult.locationName;
+                _isAqiFallback = aqiResult.status.startsWith('Fallback:');
+                _status = aqiResult.status;
+              });
+            }
+          },
+          onError: (e) {
+            setState(() => _status = 'Position stream error: $e');
+          },
+        );
 
     await _exposure.startMonitoring();
 
@@ -207,7 +204,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _exposureSub = _exposure.stream.listen((data) {
       if (!mounted) return;
 
-      final dose = _pollution.calculateDose(data.totalExposureToday, _currentAqi ?? _lastKnownAqi);
+      final dose = _pollution.calculateDose(
+        data.totalExposureToday,
+        _currentAqi ?? _lastKnownAqi,
+      );
       final doseInfo = _pollution.getDoseMessage(dose);
 
       StorageService.saveDose(dose);
@@ -235,20 +235,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (event is KeyDownEvent) {
       double? newDose;
 
-      if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
-
+      if (event.logicalKey == LogicalKeyboardKey.digit1 ||
+          event.logicalKey == LogicalKeyboardKey.numpad1) {
         newDose = 90.0;
         _manualAqiRefresh();
-      } else if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
+      } else if (event.logicalKey == LogicalKeyboardKey.digit2 ||
+          event.logicalKey == LogicalKeyboardKey.numpad2) {
         newDose = 160.0;
-      } else if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
+      } else if (event.logicalKey == LogicalKeyboardKey.digit3 ||
+          event.logicalKey == LogicalKeyboardKey.numpad3) {
         newDose = 350.0;
-      } else if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
+      } else if (event.logicalKey == LogicalKeyboardKey.digit4 ||
+          event.logicalKey == LogicalKeyboardKey.numpad4) {
         newDose = 600.0;
+      } else if (event.logicalKey == LogicalKeyboardKey.digit5 ||
+          event.logicalKey == LogicalKeyboardKey.numpad5) {
+        newDose = 00;
       }
-     else if (event.logicalKey == LogicalKeyboardKey.digit5 || event.logicalKey == LogicalKeyboardKey.numpad5) {
-      newDose = 00;
-    }
 
       if (newDose != null) {
         final doseInfo = _pollution.getDoseMessage(newDose);
@@ -375,9 +378,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         };
     }
   }
-// Replace your existing build() method with this one.
-// Only the build method changes — all your state, initState,
-// and other methods remain exactly as they are.
+  // Replace your existing build() method with this one.
+  // Only the build method changes — all your state, initState,
+  // and other methods remain exactly as they are.
 
   @override
   Widget build(BuildContext context) {
@@ -387,13 +390,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // Setting the primary color and a very soft pastel background for the main card
     if (_pollutionDose <= 100) {
       exposureColor = const Color(0xFF22C55E); // Green
-      cardBgColor = const Color(0xFFF0FDF4);   // Soft Pastel Green
+      cardBgColor = const Color(0xFFF0FDF4); // Soft Pastel Green
     } else if (_pollutionDose <= 200) {
       exposureColor = const Color(0xFFF59E0B); // Amber
-      cardBgColor = const Color(0xFFFFFBEB);   // Soft Pastel Amber
+      cardBgColor = const Color(0xFFFFFBEB); // Soft Pastel Amber
     } else {
       exposureColor = const Color(0xFFEF4444); // Red
-      cardBgColor = const Color(0xFFFEF2F2);   // Soft Pastel Red
+      cardBgColor = const Color(0xFFFEF2F2); // Soft Pastel Red
     }
 
     return DefaultTabController(
@@ -408,7 +411,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           body: SafeArea(
             child: Column(
               children: [
-
                 /// TAB BAR
                 TabBar(
                   labelColor: const Color(0xFF111827),
@@ -420,24 +422,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     letterSpacing: 0.3,
                   ),
                   tabs: const [
-                    Tab(icon: PhosphorIcon(PhosphorIconsBold.house), text: "Home"),
-                    Tab(icon: PhosphorIcon(PhosphorIconsBold.chartBar), text: "Predict"),
-                    Tab(icon: PhosphorIcon(PhosphorIconsBold.mapPin), text: "Map"),
+                    Tab(icon: Icon(Icons.home), text: "Home"),
+                    Tab(icon: Icon(Icons.bar_chart), text: "Predict"),
+                    Tab(icon: Icon(Icons.location_on), text: "Map"),
                   ],
                 ),
 
                 Expanded(
                   child: TabBarView(
                     children: [
-
                       /// HOME TAB
                       SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 24,
+                          ),
                           child: Column(
                             children: [
-
                               /// HEADER
                               Row(
                                 children: [
@@ -446,12 +449,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const HealthProfileScreen(),
+                                          builder: (context) =>
+                                              const HealthProfileScreen(),
                                         ),
                                       );
                                     },
-                                    icon: const PhosphorIcon(
-                                      PhosphorIconsBold.userCircle,
+                                    icon: const Icon(
+                                      Icons.account_circle,
                                       size: 28,
                                       color: Color(0xFF111827),
                                     ),
@@ -490,7 +494,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 ),
                                 child: Column(
                                   children: [
-
                                     /// GOOGLE FIT STYLE CIRCULAR GAUGE
                                     SizedBox(
                                       height: 240,
@@ -499,13 +502,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         fit: StackFit.expand,
                                         children: [
                                           CircularProgressIndicator(
-                                            value: (_pollutionDose / 500).clamp(0.0, 1.0),
+                                            value: (_pollutionDose / 500).clamp(
+                                              0.0,
+                                              1.0,
+                                            ),
                                             strokeWidth: 14,
                                             color: exposureColor,
-                                            backgroundColor: exposureColor.withOpacity(0.15),
+                                            backgroundColor: exposureColor
+                                                .withOpacity(0.15),
                                           ),
                                           Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
                                             children: [
                                               const Text(
                                                 "Exposure Score",
@@ -517,7 +525,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                _pollutionDose.toStringAsFixed(1),
+                                                _pollutionDose.toStringAsFixed(
+                                                  1,
+                                                ),
                                                 style: const TextStyle(
                                                   fontSize: 56,
                                                   fontWeight: FontWeight.w800,
@@ -528,17 +538,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               ),
                                               const SizedBox(height: 8),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: exposureColor.withOpacity(0.2),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(0, 2),
-                                                      )
-                                                    ]
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: exposureColor
+                                                          .withOpacity(0.2),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                                 child: Text(
                                                   _doseMessage.toUpperCase(),
@@ -560,20 +579,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
                                     /// STRUCTURED STATS ROW
                                     Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: IntrinsicHeight(
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
                                           children: [
-                                            _statTile(PhosphorIconsBold.timer, "Today", _formatDuration(_totalExposure)),
-                                            VerticalDivider(color: Colors.grey.shade200, thickness: 1),
-                                            _statTile(PhosphorIconsBold.personSimpleWalk, "Session", _formatDuration(_currentSession)),
-                                            VerticalDivider(color: Colors.grey.shade200, thickness: 1),
-                                            _statTile(PhosphorIconsBold.house, "Home", _distanceToHomeText()),
+                                            _statTile(
+                                              Icons.timer,
+                                              "Today",
+                                              _formatDuration(_totalExposure),
+                                            ),
+                                            VerticalDivider(
+                                              color: Colors.grey.shade200,
+                                              thickness: 1,
+                                            ),
+                                            _statTile(
+                                              Icons.directions_walk,
+                                              "Session",
+                                              _formatDuration(_currentSession),
+                                            ),
+                                            VerticalDivider(
+                                              color: Colors.grey.shade200,
+                                              thickness: 1,
+                                            ),
+                                            _statTile(
+                                              Icons.home,
+                                              "Home",
+                                              _distanceToHomeText(),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -590,11 +630,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       ),
                                       child: Row(
                                         children: [
-                                          Icon(PhosphorIconsBold.mapPin, color: Colors.grey.shade700),
+                                          Icon(
+                                            Icons.location_on,
+                                            color: Colors.grey.shade700,
+                                          ),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   "AQI from: ${_aqiLocationName ?? "..."}",
@@ -614,10 +658,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                 ),
                                               ],
                                             ),
-                                          )
+                                          ),
                                         ],
                                       ),
-                                    )
+                                    ),
                                   ],
                                 ),
                               ),
@@ -632,7 +676,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               /// SET HOME CARD
                               _actionCard(
                                 title: "Home Location",
-                                icon: PhosphorIconsBold.house,
+                                icon: Icons.home,
                                 buttonText: "Set Home Here",
                                 onPressed: _setHomeToCurrentLocation,
                               ),
@@ -649,16 +693,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
                                   onPressed: _setSafeZoneToCurrentLocation,
-                                  icon: const PhosphorIcon(PhosphorIconsBold.shieldCheck, size: 20),
+                                  icon: const Icon(
+                                    Icons.verified_user,
+                                    size: 20,
+                                  ),
                                   label: const Text(
                                     "Set Current Place as Safe Zone",
-                                    style: TextStyle(fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     foregroundColor: const Color(0xFF111827),
-                                    side: BorderSide(color: Colors.grey.shade300, width: 1.5),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    side: BorderSide(
+                                      color: Colors.grey.shade300,
+                                      width: 1.5,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -668,7 +724,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               /// RECOVERY CARD
                               _actionCard(
                                 title: "Recovery Plan",
-                                icon: PhosphorIconsBold.arrowClockwise,
+                                icon: Icons.refresh,
                                 buttonText: "Generate Recovery",
                                 color: const Color(0xFF4B5563), // Slate Grey
                                 onPressed: () {
@@ -685,14 +741,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               /// COMMUNITY CARD
                               _actionCard(
                                 title: "Community Forum",
-                                icon: PhosphorIconsBold.users,
+                                icon: Icons.people,
                                 buttonText: "Join Community",
-                                color: const Color(0xFF0F766E), // Deep Medical Teal
+                                color: const Color(
+                                  0xFF0F766E,
+                                ), // Deep Medical Teal
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const CommunityScreen(),
+                                      builder: (context) =>
+                                          const CommunityScreen(),
                                     ),
                                   );
                                 },
@@ -705,7 +764,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
 
                       /// PREDICT TAB
-                      Container(color: Colors.white, child: const AnalyticsScreen()),
+                      Container(
+                        color: Colors.white,
+                        child: const AnalyticsScreen(),
+                      ),
 
                       /// MAP TAB
                       Container(color: Colors.white, child: const MapScreen()),
@@ -727,7 +789,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          PhosphorIcon(icon, size: 22, color: const Color(0xFF6B7280)),
+          Icon(icon, size: 22, color: const Color(0xFF6B7280)),
           const SizedBox(height: 8),
           Text(
             title,
@@ -745,11 +807,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               fontWeight: FontWeight.w800,
               color: Color(0xFF111827),
             ),
-          )
+          ),
         ],
       ),
     );
   }
+
   Widget _buildRealTimeStatusCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -762,17 +825,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             color: Colors.blue.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           /// HEADER
           Row(
             children: [
-              const PhosphorIcon(PhosphorIconsBold.broadcast, color: Color(0xFF2563EB), size: 20),
+              const Icon(
+                Icons.wifi_tethering,
+                color: Color(0xFF2563EB),
+                size: 20,
+              ),
               const SizedBox(width: 10),
               const Text(
                 "Real-time monitoring active",
@@ -804,7 +870,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const PhosphorIcon(PhosphorIconsBold.info, color: Color(0xFF9CA3AF), size: 18),
+              const Icon(
+                Icons.info_outline,
+                color: Color(0xFF9CA3AF),
+                size: 18,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -818,6 +888,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         color: Color(0xFF4B5563),
                       ),
                     ),
+                    if (_isAqiFallback) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Fallback active: showing ${PollutionService.fallbackAqi.round()} US AQI while live data is unavailable.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     // Using the existing _distanceToHomeText() logic
                     Text(
@@ -831,10 +910,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     // Placeholder for the missing sensor distance logic
                     const Text(
                       "AQI sensor distance: -- m away",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9CA3AF),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                     ),
                   ],
                 ),
@@ -845,6 +921,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
+
   Widget _actionCard({
     required String title,
     required IconData icon,
@@ -863,7 +940,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             color: Colors.black.withOpacity(0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
-          )
+          ),
         ],
         border: Border.all(color: Colors.grey.shade100, width: 1),
       ),
@@ -878,7 +955,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   color: const Color(0xFFF4F6F8),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: PhosphorIcon(icon, size: 20, color: const Color(0xFF111827)),
+                child: Icon(icon, size: 20, color: const Color(0xFF111827)),
               ),
               const SizedBox(width: 12),
               Text(
@@ -927,15 +1004,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onPressed: onPressed,
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
-          foregroundColor: const Color(0xFFEF4444), // Red for clear/delete actions
+          foregroundColor: const Color(
+            0xFFEF4444,
+          ), // Red for clear/delete actions
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -946,7 +1022,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final pos = await _loc.getCurrentPosition();
 
       // 2. Fetch AQI from your existing service
-      final aqiResult = await _pollution.getAqiForLocation(pos.latitude, pos.longitude);
+      final aqiResult = await _pollution.getAqiForLocation(
+        pos.latitude,
+        pos.longitude,
+      );
 
       if (!mounted) return;
 
@@ -955,6 +1034,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _currentPosition = pos;
         _lastKnownAqi = aqiResult.aqi;
         _aqiLocationName = aqiResult.locationName;
+        _isAqiFallback = aqiResult.status.startsWith('Fallback:');
         _status = 'Manual Refresh: ${aqiResult.status}';
       });
     } catch (e) {

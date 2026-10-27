@@ -1,7 +1,6 @@
 // lib/community/community_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../screens/community/policy_simulation_tab.dart';
 
 // =============================================================================

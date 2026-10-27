@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../models/policy_model.dart';
 import '../../../data/policy_data.dart';
 
@@ -57,7 +56,7 @@ class _PolicyCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: 130,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),

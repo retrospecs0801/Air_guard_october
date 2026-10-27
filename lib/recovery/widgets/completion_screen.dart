@@ -1,149 +1,198 @@
 // lib/recovery/widgets/completion_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class CompletionScreen extends StatelessWidget {
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../widgets/ui/app_card.dart';
+
+class CompletionScreen extends StatefulWidget {
   final String exposureLevel;
   final String insight;
   final List<String> completedTasks;
+  final List<String>? taskSummaries;
+  final int? totalTaskCount;
 
   const CompletionScreen({
-    Key? key,
+    super.key,
     required this.exposureLevel,
     required this.insight,
     required this.completedTasks,
-  }) : super(key: key);
+    this.taskSummaries,
+    this.totalTaskCount,
+  });
+
+  @override
+  State<CompletionScreen> createState() => _CompletionScreenState();
+}
+
+class _CompletionScreenState extends State<CompletionScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entryController;
+
+  @override
+  void initState() {
+    super.initState();
+    HapticFeedback.mediumImpact();
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _entryController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final app = context.app;
+    final summaryItems = widget.taskSummaries ?? widget.completedTasks;
+
     return Scaffold(
-      backgroundColor: Colors.green[50],
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Success Animation (using simple Icon for MVP)
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.green[100],
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  size: 80,
-                  color: Colors.green,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Success Message
-              const Text(
-                'Recovery Complete!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Insight Message
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  insight,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Completed Tasks Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.task_alt, color: Colors.green),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${completedTasks.length} Tasks Completed',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: AppSpacing.xl),
+                      AnimatedBuilder(
+                        animation: _entryController,
+                        builder: (context, child) {
+                          final progress = _entryController.value;
+                          final scale = Curves.elasticOut.transform(progress);
+                          return SizedBox.square(
+                            dimension: 152,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Opacity(
+                                  opacity: (1 - progress).clamp(0.0, 1.0),
+                                  child: Transform.scale(
+                                    scale: 0.72 + (progress * 0.55),
+                                    child: Container(
+                                      width: 112,
+                                      height: 112,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: app.aqi.good.color.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Transform.scale(
+                                  scale: scale,
+                                  child: Container(
+                                    width: 104,
+                                    height: 104,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: app.aqi.good.softBackground,
+                                    ),
+                                    child: Icon(
+                                      Icons.check_rounded,
+                                      color: app.aqi.good.color,
+                                      size: 56,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text('Well done', style: theme.textTheme.headlineMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Exposure level: ${widget.exposureLevel}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: completedTasks.map((task) {
-                        return Chip(
-                          label: Text(
-                            task,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          backgroundColor: Colors.green[50],
-                          side: BorderSide(color: Colors.green[200]!),
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppCard(
+                        child: Column(
+                          children: [
+                            Text(
+                              widget.insight,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                            if (summaryItems.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              const Divider(),
+                              const SizedBox(height: AppSpacing.sm),
+                              for (final item in summaryItems)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.xs,
+                                  ),
+                                  child: Text(
+                                    item,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            if (widget.totalTaskCount != null) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                '${widget.completedTasks.length} of ${widget.totalTaskCount} tasks complete',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: app.aqi.good.color,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 40),
-
-              // Action Buttons
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Go back to home (pop all recovery screens)
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Semantics(
+                    button: true,
+                    label: 'Back to home',
+                    child: FilledButton(
+                      onPressed: () {
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
+                      },
+                      child: const Text('Back to Home'),
                     ),
-                  ),
-                  child: const Text(
-                    'Back to Home',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

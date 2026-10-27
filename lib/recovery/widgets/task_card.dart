@@ -1,27 +1,32 @@
 // lib/recovery/widgets/task_card.dart
 import 'package:flutter/material.dart';
+
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../widgets/ui/app_card.dart';
 import '../models/recovery_task.dart';
 import 'guided_breathing.dart';
+import 'recovery_task_icon.dart';
 
 class TaskCard extends StatelessWidget {
   final RecoveryTask task;
   final VoidCallback onComplete;
+  final Animation<double>? entryAnimation;
 
   const TaskCard({
-    Key? key,
+    super.key,
     required this.task,
     required this.onComplete,
-  }) : super(key: key);
+    this.entryAnimation,
+  });
 
   void _handleStart(BuildContext context) {
     if (task.type == TaskType.breathing) {
       // Open guided breathing screen
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => GuidedBreathingScreen(
-            task: task,
-            onComplete: onComplete,
-          ),
+          builder: (_) =>
+              GuidedBreathingScreen(task: task, onComplete: onComplete),
         ),
       );
     } else {
@@ -36,12 +41,12 @@ class TaskCard extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Text(task.icon, style: const TextStyle(fontSize: 28)),
-            const SizedBox(width: 12),
+            RecoveryTaskIconTile(task: task),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 task.title,
-                style: const TextStyle(fontSize: 18),
+                style: Theme.of(ctx).textTheme.titleLarge,
               ),
             ),
           ],
@@ -50,14 +55,13 @@ class TaskCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(task.description),
+            Text(task.description, style: Theme.of(ctx).textTheme.bodyMedium),
             if (task.type == TaskType.doctorCTA) ...[
-              const SizedBox(height: 16),
-              const Text(
+              const SizedBox(height: AppSpacing.md),
+              Text(
                 'Your exposure score suggests medical advice is recommended. Please contact a healthcare professional if you feel unwell.',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.red,
+                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(ctx).colorScheme.error,
                 ),
               ),
             ],
@@ -71,13 +75,13 @@ class TaskCard extends StatelessWidget {
                 // Here you could add actual phone dialer or teleconsult link
                 onComplete();
               },
-              child: const Text('Contact Doctor'),
+              child: const Text('Contact doctor'),
             ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               onComplete();
@@ -91,97 +95,106 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: task.isCompleted ? 0 : 2,
-      color: task.isCompleted ? Colors.grey[100] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: task.isCompleted
-            ? BorderSide(color: Colors.green[300]!, width: 2)
-            : BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Icon
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: task.isCompleted
-                    ? Colors.green[100]
-                    : Colors.blue[50],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: task.isCompleted
-                    ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
-                    : Text(task.icon, style: const TextStyle(fontSize: 28)),
-              ),
-            ),
-            const SizedBox(width: 16),
+    final theme = Theme.of(context);
+    final app = context.app;
+    final animation = entryAnimation ?? const AlwaysStoppedAnimation(1.0);
 
-            // Task Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(animation),
+        child: FadeTransition(
+          opacity: animation,
+          child: Opacity(
+            opacity: task.isCompleted ? 0.68 : 1,
+            child: AppCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
                 children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      decoration: task.isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    task.description,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (task.durationSeconds > 0) ...[
-                    const SizedBox(height: 6),
-                    Row(
+                  RecoveryTaskIconTile(task: task),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.timer_outlined,
-                            size: 14, color: Colors.grey[500]),
-                        const SizedBox(width: 4),
+                        Text(task.title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          '${task.durationSeconds}s',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_outlined,
+                              color: app.textTertiary,
+                            ),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(
+                              task.durationSeconds > 0
+                                  ? '${task.durationSeconds} sec'
+                                  : 'Anytime',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  if (task.isCompleted)
+                    Semantics(
+                      label: 'Done',
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.65, end: 1),
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.elasticOut,
+                            builder: (context, scale, child) =>
+                                Transform.scale(scale: scale, child: child),
+                            child: Icon(
+                              Icons.check_circle,
+                              color: app.aqi.good.color,
+                            ),
+                          ),
+                          Text('Done', style: theme.textTheme.labelSmall),
+                        ],
+                      ),
+                    )
+                  else
+                    Semantics(
+                      button: true,
+                      label: 'Start ${task.title}',
+                      child: FilledButton.tonal(
+                        onPressed: () => _handleStart(context),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
+                        ),
+                        child: const Text('Start'),
+                      ),
+                    ),
                 ],
               ),
             ),
-
-            // Action Button
-            if (!task.isCompleted)
-              ElevatedButton(
-                onPressed: () => _handleStart(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Start'),
-              ),
-          ],
+          ),
         ),
       ),
     );

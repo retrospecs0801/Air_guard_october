@@ -1,6 +1,12 @@
 // lib/recovery/widgets/guided_breathing.dart
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
 import '../models/recovery_task.dart';
 
 class GuidedBreathingScreen extends StatefulWidget {
@@ -8,10 +14,10 @@ class GuidedBreathingScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
   const GuidedBreathingScreen({
-    Key? key,
+    super.key,
     required this.task,
     required this.onComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<GuidedBreathingScreen> createState() => _GuidedBreathingScreenState();
@@ -20,13 +26,13 @@ class GuidedBreathingScreen extends StatefulWidget {
 class _GuidedBreathingScreenState extends State<GuidedBreathingScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
   Timer? _timer;
   int _remainingSeconds = 0;
   String _currentPhase = 'Inhale';
   bool _isRunning = false;
+  bool _hasStarted = false;
 
-  final List<Map<String, dynamic>> _breathingCycle = [
+  final List<Map<String, Object>> _breathingCycle = [
     {'phase': 'Inhale', 'duration': 4},
     {'phase': 'Hold', 'duration': 4},
     {'phase': 'Exhale', 'duration': 4},
@@ -46,52 +52,48 @@ class _GuidedBreathingScreenState extends State<GuidedBreathingScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
-
-    _scaleAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
   }
 
   void _startBreathing() {
     setState(() {
       _isRunning = true;
+      _hasStarted = true;
     });
     _runBreathingCycle();
   }
 
   void _runBreathingCycle() {
     final cycle = _breathingCycle[_currentCycleIndex];
+    final phase = cycle['phase'] as String;
+    final duration = cycle['duration'] as int;
+    if (_currentPhase != phase) {
+      HapticFeedback.lightImpact();
+    }
     setState(() {
-      _currentPhase = cycle['phase'];
+      _currentPhase = phase;
     });
 
-    // Animate based on phase
-    if (cycle['phase'] == 'Inhale') {
-      _animationController.forward();
-    } else if (cycle['phase'] == 'Exhale') {
-      _animationController.reverse();
-    }
+    _animationController
+      ..duration = Duration(seconds: duration)
+      ..value = 0
+      ..forward();
 
-    // Move to next phase after duration
-    // MODIFICATION: Explicitly cast cycle['duration'] to an int to fix the type error.
-    _timer = Timer(Duration(seconds: cycle['duration'] as int), () {
+    _timer = Timer(Duration(seconds: duration), () {
       if (!mounted) return;
 
       setState(() {
         _currentCycleIndex = (_currentCycleIndex + 1) % _breathingCycle.length;
-        // MODIFICATION: Also cast here to ensure type safety.
-        _remainingSeconds -= cycle['duration'] as int;
+        _remainingSeconds = math.max(0, _remainingSeconds - duration);
 
         if (_currentCycleIndex == 0) {
           _cyclesCompleted++;
         }
-
-        if (_cyclesCompleted >= _totalCycles || _remainingSeconds <= 0) {
-          _completeExercise();
-        } else {
-          _runBreathingCycle();
-        }
       });
+      if (_cyclesCompleted >= _totalCycles || _remainingSeconds <= 0) {
+        _completeExercise();
+      } else {
+        _runBreathingCycle();
+      }
     });
   }
 
@@ -99,32 +101,27 @@ class _GuidedBreathingScreenState extends State<GuidedBreathingScreen>
     _timer?.cancel();
     _animationController.stop();
 
-    // Show completion dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 32),
-            SizedBox(width: 12),
-            Text('Great Work!'),
+            Icon(Icons.check_circle),
+            SizedBox(width: AppSpacing.sm),
+            Text('Great work!'),
           ],
         ),
         content: const Text(
           'You completed the breathing exercise. Deep breathing helps clear your airways and reduces pollution effects.',
         ),
         actions: [
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               widget.onComplete();
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
             child: const Text('Done'),
           ),
         ],
@@ -149,124 +146,312 @@ class _GuidedBreathingScreenState extends State<GuidedBreathingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final app = context.app;
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
+
     return Scaffold(
-      backgroundColor: Colors.blue[50],
-      appBar: AppBar(
-        title: Text(widget.task.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.pop(context),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.scaffoldBackgroundColor,
+              Color.lerp(theme.scaffoldBackgroundColor, app.brandSoft, 0.38)!,
+            ],
           ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Animated Circle
-            AnimatedBuilder(
-              animation: _scaleAnimation,
-              builder: (context, child) {
-                return Container(
-                  width: 200 * _scaleAnimation.value,
-                  height: 200 * _scaleAnimation.value,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue.withOpacity(0.3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.4),
-                        blurRadius: 40 * _scaleAnimation.value,
-                        spreadRadius: 10 * _scaleAnimation.value,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      _currentPhase,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[900],
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    Semantics(
+                      button: true,
+                      label: 'End session',
+                      child: IconButton(
+                        tooltip: 'End session',
+                        constraints: const BoxConstraints.tightFor(
+                          width: 48,
+                          height: 48,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 60),
-
-            // Instructions
-            Text(
-              _isRunning ? 'Follow the circle' : widget.task.description,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Cycle Counter
-            if (_isRunning)
-              Text(
-                'Cycle ${_cyclesCompleted + 1}/$_totalCycles',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                ),
-              ),
-            const SizedBox(height: 40),
-
-            // Control Buttons
-            if (!_isRunning)
-              ElevatedButton.icon(
-                onPressed: _startBreathing,
-                icon: const Icon(Icons.play_arrow, size: 28),
-                label: const Text(
-                  'Start',
-                  style: TextStyle(fontSize: 18),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              )
-            else
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _pauseBreathing,
-                    icon: const Icon(Icons.pause),
-                    label: const Text('Pause'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        widget.task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  OutlinedButton.icon(
-                    onPressed: _completeExercise,
-                    icon: const Icon(Icons.skip_next),
-                    label: const Text('Skip'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey[700],
+                    const SizedBox(width: AppSpacing.sm),
+                    AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, _) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatTime(_displayRemainingSeconds),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          Text('remaining', style: theme.textTheme.labelSmall),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-          ],
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final orbSize = math.min(240.0, constraints.maxWidth - 48);
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: AppSpacing.lg),
+                            AnimatedBuilder(
+                              animation: _animationController,
+                              builder: (context, _) {
+                                final progress = Curves.easeInOutSine.transform(
+                                  _animationController.value,
+                                );
+                                final animatedScale =
+                                    switch (_currentCycleIndex) {
+                                      0 => 0.84 + (0.16 * progress),
+                                      1 => 1.0,
+                                      2 => 1.0 - (0.16 * progress),
+                                      _ => 0.84,
+                                    };
+                                final staticScale =
+                                    switch (_currentCycleIndex) {
+                                      0 || 1 => 1.0,
+                                      _ => 0.84,
+                                    };
+                                return SizedBox.square(
+                                  dimension: orbSize + 32,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: orbSize + 32,
+                                        height: orbSize + 32,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.12),
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        width: orbSize + 16,
+                                        height: orbSize + 16,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.2),
+                                          ),
+                                        ),
+                                      ),
+                                      Transform.scale(
+                                        scale: disableAnimations
+                                            ? staticScale
+                                            : animatedScale,
+                                        child: Container(
+                                          width: orbSize,
+                                          height: orbSize,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: RadialGradient(
+                                              colors: [
+                                                theme.colorScheme.primary,
+                                                theme.colorScheme.primary
+                                                    .withValues(alpha: 0.82),
+                                                app.brandSoft,
+                                              ],
+                                              stops: const [0, 0.68, 1],
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: theme.colorScheme.primary
+                                                    .withValues(alpha: 0.22),
+                                                blurRadius: 44,
+                                                spreadRadius: 8,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            Icons.air,
+                                            color: theme.colorScheme.onPrimary,
+                                            size: orbSize * 0.28,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 250),
+                              child: Text(
+                                _currentPhase,
+                                key: ValueKey(_currentPhase),
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            AnimatedBuilder(
+                              animation: _animationController,
+                              builder: (context, _) => Text(
+                                '${_displayPhaseSeconds}s',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              _isRunning
+                                  ? 'Cycle ${_cyclesCompleted + 1}/$_totalCycles'
+                                  : widget.task.description,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                child: Column(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, _) {
+                        final progress = widget.task.durationSeconds <= 0
+                            ? 0.0
+                            : 1 -
+                                  (_displayRemainingSeconds /
+                                      widget.task.durationSeconds);
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progress.clamp(0.0, 1.0),
+                            minHeight: 6,
+                            color: theme.colorScheme.primary,
+                            backgroundColor: app.surfaceMuted,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    if (!_isRunning)
+                      SizedBox(
+                        width: double.infinity,
+                        child: Semantics(
+                          button: true,
+                          label: _hasStarted
+                              ? 'Resume breathing'
+                              : 'Start breathing',
+                          child: FilledButton.icon(
+                            onPressed: _startBreathing,
+                            icon: const Icon(Icons.play_arrow),
+                            label: Text(_hasStarted ? 'Resume' : 'Start'),
+                          ),
+                        ),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: 'Pause breathing',
+                            child: FilledButton.tonalIcon(
+                              onPressed: _pauseBreathing,
+                              icon: const Icon(Icons.pause),
+                              label: const Text('Pause'),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Semantics(
+                            button: true,
+                            label: 'Skip breathing exercise',
+                            child: OutlinedButton.icon(
+                              onPressed: _completeExercise,
+                              icon: const Icon(Icons.skip_next),
+                              label: const Text('Skip'),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  int get _phaseDuration =>
+      _breathingCycle[_currentCycleIndex]['duration'] as int;
+
+  int get _displayPhaseSeconds {
+    if (!_isRunning) return _phaseDuration;
+    return (_phaseDuration -
+            (_animationController.value * _phaseDuration).floor())
+        .clamp(1, _phaseDuration);
+  }
+
+  int get _displayRemainingSeconds {
+    if (!_isRunning) return _remainingSeconds;
+    final elapsed = (_animationController.value * _phaseDuration).floor();
+    return (_remainingSeconds - elapsed).clamp(0, _remainingSeconds);
+  }
+
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainder = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainder.toString().padLeft(2, '0')}';
   }
 }

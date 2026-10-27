@@ -1,7 +1,6 @@
 // lib/widgets/community/simulation_controls.dart
 
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../models/policy_model.dart';
 
 class SimulationControls extends StatelessWidget {
@@ -89,7 +88,7 @@ class SimulationControls extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    PhosphorIconsBold.play,
+                    Icons.play_arrow,
                     size: 15,
                     color: Colors.white,
                   ),

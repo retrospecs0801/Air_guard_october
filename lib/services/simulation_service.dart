@@ -4,7 +4,6 @@
 // All methods are static — no instantiation needed.
 
 import 'dart:math';
-import '../models/policy_model.dart';
 
 class SimulationService {
   /// Computes day-by-day AQI values for the policy-applied curve.

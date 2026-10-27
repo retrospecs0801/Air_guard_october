@@ -22,6 +22,8 @@ class PollutionData {
 enum PollutionLevel { low, moderate, high, critical }
 
 class PollutionService {
+  static const double fallbackAqi = 120;
+
   // ------------------------------------------------------------
   // Set your WAQI token here (or inject via constructor)
   // Example token format: '51bb235709d3bf96fe7f048bd31fec5a2e1fb33d'
@@ -33,37 +35,49 @@ class PollutionService {
   /// Fetches the nearest AQI for the given coordinates using WAQI.
   /// Uses the WAQI `feed/geo:lat;lng` endpoint which returns the nearest station.
   /// Verifies station is within `maxDistanceMeters` before returning.
-  Future<({double? aqi, String? locationName, String status})> getAqiForLocation(
-      double lat, double lng,
-      {int maxDistanceMeters = 20000}) async {
+  Future<({double? aqi, String? locationName, String status})>
+  getAqiForLocation(
+    double lat,
+    double lng, {
+    int maxDistanceMeters = 20000,
+  }) async {
     try {
       if (waqiToken == 'YOUR_WAQI_TOKEN_HERE' || waqiToken.trim().isEmpty) {
-        return (aqi: null, locationName: null, status: 'WAQI token not set.');
+        return _fallbackAqi('WAQI token not set.');
       }
 
       // WAQI uses a path like /feed/geo:LAT;LNG
       final path = '/feed/geo:$lat;$lng';
       final uri = Uri.https('api.waqi.info', path, {'token': waqiToken});
 
-      final resp = await http.get(uri);
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode != 200) {
-        return (aqi: null, locationName: null, status: 'WAQI HTTP error: ${resp.statusCode}');
+        return _fallbackAqi('WAQI HTTP error: ${resp.statusCode}.');
       }
 
-      final Map<String, dynamic> body = json.decode(resp.body) as Map<String, dynamic>;
+      final Map<String, dynamic> body =
+          json.decode(resp.body) as Map<String, dynamic>;
 
       // WAQI top-level status field
       final statusStr = (body['status'] ?? '').toString();
       if (statusStr != 'ok') {
-        final msg = body['data'] != null ? json.encode(body['data']) : 'WAQI responded: $statusStr';
-        return (aqi: null, locationName: null, status: 'WAQI error: $msg');
+        final msg = body['data'] != null
+            ? json.encode(body['data'])
+            : 'WAQI responded: $statusStr';
+        return _fallbackAqi('WAQI error: $msg');
       }
 
-      final Map<String, dynamic> data = (body['data'] ?? {}) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          (body['data'] ?? {}) as Map<String, dynamic>;
 
       // aqi (already on US scale or WAQI's scale)
-      final int? aqiInt = (data['aqi'] is num) ? (data['aqi'] as num).toInt() : null;
-      final double? aqiVal = aqiInt != null ? aqiInt.toDouble() : null;
+      final int? aqiInt = (data['aqi'] is num)
+          ? (data['aqi'] as num).toInt()
+          : null;
+      if (aqiInt == null) {
+        return _fallbackAqi('WAQI response did not include an AQI value.');
+      }
+      final double aqiVal = aqiInt.toDouble();
 
       // station coordinates: data.city.geo => [lat, lon]
       List<dynamic>? geo = (data['city']?['geo']) as List<dynamic>?;
@@ -77,15 +91,18 @@ class PollutionService {
       // compute distance if coords available
       double? distanceMeters;
       if (stationLat != null && stationLng != null) {
-        distanceMeters = _haversineDistanceMeters(lat, lng, stationLat, stationLng);
+        distanceMeters = _haversineDistanceMeters(
+          lat,
+          lng,
+          stationLat,
+          stationLng,
+        );
       }
 
       // If station is too far, return not-local
       if (distanceMeters != null && distanceMeters > maxDistanceMeters) {
-        return (
-        aqi: null,
-        locationName: null,
-        status: 'Nearest WAQI station is ${distanceMeters.round()} m away — beyond maxDistance ($maxDistanceMeters m).'
+        return _fallbackAqi(
+          'Nearest WAQI station is ${distanceMeters.round()} m away, beyond the $maxDistanceMeters m limit.',
         );
       }
 
@@ -94,22 +111,39 @@ class PollutionService {
 
       // success
       return (
-      aqi: aqiVal,
-      locationName: locationName,
-      status: 'WAQI: ${aqiInt ?? 'N/A'} at ${locationName ?? 'Unknown'}${distanceMeters != null ? ' (${distanceMeters.round()} m)' : ''}'
+        aqi: aqiVal,
+        locationName: locationName,
+        status:
+            'WAQI: $aqiInt at ${locationName ?? 'Unknown'}${distanceMeters != null ? ' (${distanceMeters.round()} m)' : ''}',
       );
     } catch (e) {
-      return (aqi: null, locationName: null, status: 'Network error WAQI: $e');
+      return _fallbackAqi('WAQI fetch failed: $e');
     }
   }
 
+  ({double? aqi, String? locationName, String status}) _fallbackAqi(
+    String reason,
+  ) => (
+    aqi: fallbackAqi,
+    locationName: 'Fallback estimate',
+    status: 'Fallback: using 120 US AQI. $reason',
+  );
+
   // --- helper: haversine distance in meters ---
-  double _haversineDistanceMeters(double lat1, double lon1, double lat2, double lon2) {
+  double _haversineDistanceMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const R = 6371000.0; // Earth radius in meters
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
-    final a = (sin(dLat / 2) * sin(dLat / 2)) +
-        cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) * (sin(dLon / 2) * sin(dLon / 2));
+    final a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(_deg2rad(lat1)) *
+            cos(_deg2rad(lat2)) *
+            (sin(dLon / 2) * sin(dLon / 2));
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;
   }

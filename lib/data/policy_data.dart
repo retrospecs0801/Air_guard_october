@@ -1,7 +1,6 @@
 // lib/data/policy_data.dart
 
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../models/policy_model.dart';
 
 class PolicyData {
@@ -10,7 +9,7 @@ class PolicyData {
       id: 'odd_even',
       name: 'Odd-Even Rule',
       shortDescription: 'Vehicles allowed on alternate days by plate number',
-      icon: PhosphorIconsBold.car,
+      icon: Icons.directions_car,
       kBase: 0.005,
       sourceBreakdown: {
         'transport': 35,
@@ -34,7 +33,7 @@ class PolicyData {
       id: 'work_from_home',
       name: 'Work From Home',
       shortDescription: '50% of offices shift to remote work mandate',
-      icon: PhosphorIconsBold.houseLine,
+      icon: Icons.house_outlined,
       kBase: 0.007,
       sourceBreakdown: {
         'transport': 35,
@@ -58,7 +57,7 @@ class PolicyData {
       id: 'construction_ban',
       name: 'Construction Ban',
       shortDescription: 'Halt of all non-essential construction activity',
-      icon: PhosphorIconsBold.prohibit,
+      icon: Icons.block,
       kBase: 0.006,
       sourceBreakdown: {
         'transport': 35,
@@ -82,7 +81,7 @@ class PolicyData {
       id: 'industrial_control',
       name: 'Industrial Control',
       shortDescription: 'Emission caps and partial shutdown of heavy industry',
-      icon: PhosphorIconsBold.factory,
+      icon: Icons.factory,
       kBase: 0.010,
       sourceBreakdown: {
         'transport': 35,
@@ -106,7 +105,7 @@ class PolicyData {
       id: 'public_transport_boost',
       name: 'Public Transport Boost',
       shortDescription: 'Free & expanded bus/metro service to reduce private vehicles',
-      icon: PhosphorIconsBold.bus,
+      icon: Icons.directions_bus,
       kBase: 0.006,
       sourceBreakdown: {
         'transport': 35,
